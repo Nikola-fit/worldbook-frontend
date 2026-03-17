@@ -16,41 +16,105 @@
               {{ bookTitle }}
             </h1>
             <p class="mt-1 text-sm text-slate-500">
-              Izaberi poglavlje lijevo. Tekst je prikazan u “reader” formatu
+              Izaberi poglavlje lijevo. Tekst je prikazan u "reader" formatu
               radi čitljivosti.
             </p>
           </div>
 
           <div class="flex items-center gap-2">
+            <!-- Refresh dugme -->
             <button
-              v-if="!hasSubmittedForSelectedChapter"
               type="button"
-              class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition disabled:opacity-60 disabled:hover:translate-y-0"
-              :disabled="!selectedChapter"
-              @click="openModal = true"
+              class="inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition disabled:opacity-50"
+              :disabled="loading"
+              :title="loading ? 'Osvježavanje...' : 'Osveži sadržaj knjige'"
+              @click="handleRefresh"
             >
-              Dodaj pasus
+              <svg
+                class="w-4 h-4 transition-transform"
+                :class="{ 'animate-spin': loading }"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span class="ml-1.5 hidden sm:inline">Osveži</span>
             </button>
 
-            <div
-              v-else
-              class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700"
-            >
-              <span class="font-medium">Poslato</span>
-              <span class="text-amber-600">• čeka odobrenje</span>
-            </div>
+            <!-- Status / Dodaj dugme -->
+            <template v-if="selectedChapter">
+              <!-- Još učitavamo status -->
+              <div
+                v-if="chapterStatusLoading"
+                class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400"
+              >
+                <span>Provjera...</span>
+              </div>
+
+              <!-- Već poslato — pending -->
+              <div
+                v-else-if="currentChapterStatus === 'pending'"
+                class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"
+                ></span>
+                <span class="font-medium">Poslato</span>
+                <span class="text-amber-500">• čeka odobrenje</span>
+              </div>
+
+              <!-- Approved -->
+              <div
+                v-else-if="currentChapterStatus === 'approved'"
+                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="font-medium">Odobreno</span>
+              </div>
+
+              <!-- Rejected -->
+              <div
+                v-else-if="currentChapterStatus === 'rejected'"
+                class="flex items-center gap-2"
+              >
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition"
+                  @click="openModal = true"
+                >
+                  Dodaj pasus
+                </button>
+              </div>
+              <!-- Nije poslato — prikaži dugme -->
+              <button
+                v-else
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition"
+                @click="openModal = true"
+              >
+                Dodaj pasus
+              </button>
+            </template>
           </div>
         </div>
 
+        <!-- Content grid -->
         <div class="flex flex-col lg:flex-row gap-6">
           <!-- Mobile chapter picker -->
           <div class="lg:hidden">
-            <label class="block text-xs font-medium text-slate-600 mb-1">
-              Izaberi poglavlje
-            </label>
+            <label class="block text-xs font-medium text-slate-600 mb-1"
+              >Izaberi poglavlje</label
+            >
             <select
-              class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
               v-model="selectedChapterId"
+              class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             >
               <option
                 v-for="ch in filteredChapters"
@@ -63,11 +127,10 @@
           </div>
 
           <!-- Sidebar (desktop) -->
-          <aside class="hidden lg:block w-[320px]">
+          <aside class="hidden lg:block w-[320px] shrink-0">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div class="px-5 py-4 border-b border-slate-200">
                 <h2 class="text-sm font-semibold text-slate-700">Poglavlja</h2>
-
                 <div class="mt-3">
                   <input
                     v-model.trim="query"
@@ -76,7 +139,6 @@
                     class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                   />
                 </div>
-
                 <p class="text-xs text-slate-500 mt-2">
                   Ukupno: {{ chapters.length }}
                 </p>
@@ -114,20 +176,18 @@
           </aside>
 
           <!-- Reader -->
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div class="px-5 md:px-6 py-4 border-b border-slate-200">
                 <div v-if="loading" class="text-sm text-slate-500">
                   Učitavanje…
                 </div>
-
                 <div
                   v-else-if="error"
                   class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
                 >
                   {{ error }}
                 </div>
-
                 <template v-else>
                   <h2 class="text-base font-semibold text-slate-800">
                     {{
@@ -149,7 +209,6 @@
                 >
                   Izaberi poglavlje da vidiš sadržaj.
                 </div>
-
                 <div
                   v-else-if="selectedChapter"
                   class="mx-auto max-w-[70ch] font-serif text-[16px] leading-relaxed text-slate-800 whitespace-pre-line"
@@ -164,15 +223,17 @@
         </div>
       </div>
 
-      <!-- Modal (ostaje, za kasnije submit) -->
+      <!-- ─── Modal ────────────────────────────────────────────────────────── -->
       <Teleport to="body">
         <div
           v-if="openModal"
           class="fixed inset-0 z-50 flex items-center justify-center px-4"
+          @keydown.esc="closeModal"
         >
+          <!-- Backdrop -->
           <div
             class="absolute inset-0 bg-slate-900/40"
-            @click="openModal = false"
+            @click="closeModal"
           ></div>
 
           <div
@@ -185,14 +246,29 @@
                 <h3 class="text-sm font-semibold text-slate-800">
                   Dodaj pasus
                 </h3>
-                <p class="text-xs text-slate-500 mt-1">Max 15 riječi.</p>
+                <p class="text-xs text-slate-500 mt-1">
+                  Max {{ maxWords }} riječi • Poglavlje
+                  {{ selectedChapter?.chapter_number ?? "-" }}
+                </p>
               </div>
               <button
                 type="button"
-                class="text-sm text-slate-500 hover:text-slate-700"
-                @click="openModal = false"
+                class="text-slate-400 hover:text-slate-600 transition"
+                @click="closeModal"
               >
-                ✕
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
               </button>
             </div>
 
@@ -204,58 +280,40 @@
                 v-model="paragraph"
                 class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[140px] resize-none"
                 placeholder="Napiši svoj pasus..."
+                :disabled="submitting"
               />
 
               <div class="mt-2 flex items-center justify-between text-xs">
                 <span
                   :class="
-                    wordCount > maxWords ? 'text-red-600' : 'text-slate-500'
+                    wordCount > maxWords
+                      ? 'text-red-600 font-medium'
+                      : 'text-slate-500'
                   "
                 >
                   {{ wordCount }} / {{ maxWords }} riječi
                 </span>
-                <span class="text-slate-400">
-                  Poglavlje: {{ selectedChapter?.chapter_number ?? "-" }}
-                </span>
+                <!-- Progress bar -->
+                <div class="w-24 h-1 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all"
+                    :class="wordCount > maxWords ? 'bg-red-400' : 'bg-sky-400'"
+                    :style="{
+                      width: Math.min((wordCount / maxWords) * 100, 100) + '%',
+                    }"
+                  ></div>
+                </div>
               </div>
 
+              <!-- Greška: previše riječi -->
               <div
                 v-if="wordCount > maxWords"
                 class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
               >
                 Prekoračio si limit. Skrati pasus na {{ maxWords }} riječi.
               </div>
-              <div class="mt-4 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition"
-                  @click="openModal = false"
-                >
-                  Otkaži
-                </button>
 
-                <button
-                  v-if="!hasSubmittedForSelectedChapter"
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition disabled:opacity-60 disabled:hover:translate-y-0"
-                  :disabled="
-                    submitting || wordCount === 0 || wordCount > maxWords
-                  "
-                  @click="submitCurrentParagraph"
-                >
-                  <span v-if="!submitting">Pošalji pasus</span>
-                  <span v-else>Slanje...</span>
-                </button>
-
-                <div
-                  v-else
-                  class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700"
-                >
-                  <span class="font-medium">Poslato</span>
-                  <span class="text-amber-600">• čeka odobrenje</span>
-                </div>
-              </div>
-
+              <!-- Greška: submit -->
               <div
                 v-if="submitError"
                 class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
@@ -263,11 +321,45 @@
                 {{ submitError }}
               </div>
 
-              <div
-                v-if="submitSuccess"
-                class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
-              >
-                {{ submitSuccess }}
+              <div class="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition"
+                  @click="closeModal"
+                >
+                  Otkaži
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition disabled:opacity-60 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+                  :disabled="
+                    submitting || wordCount === 0 || wordCount > maxWords
+                  "
+                  @click="submitCurrentParagraph"
+                >
+                  <svg
+                    v-if="submitting"
+                    class="w-4 h-4 mr-1.5 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    />
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  <span>{{ submitting ? "Slanje..." : "Pošalji pasus" }}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -278,109 +370,79 @@
 </template>
 
 <script setup>
-import * as bookService from "@/services/book.service";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import PublicLayout from "@/layouts/PublicLayout.vue";
 import { http } from "@/lib/http";
+import * as bookService from "@/services/book.service";
+import { useSubmissionStatus } from "@/composables/useSubmissionStatus";
+
+// ─── Book state ──────────────────────────────────────────────────────────────
 
 const loading = ref(false);
 const error = ref("");
 
+const book = ref(null);
 const bookTitle = ref("Knjiga");
 const chapters = ref([]);
-const book = ref(null);
-
-const selectedChapterId = ref(null);
-const selectedChapter = computed(
-  () => chapters.value.find((c) => c.id === selectedChapterId.value) || null,
-);
-const hasSubmittedForSelectedChapter = computed(() => {
-  if (!book.value || !selectedChapter.value) return false;
-
-  return getSubmittedChapters(book.value.id).includes(selectedChapter.value.id);
-});
-
-const submitting = ref(false);
-const submitError = ref("");
-const submitSuccess = ref("");
 
 const query = ref("");
 
-function parseJwt(token) {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
-
-function getUserIdFromAccessToken() {
-  const token = localStorage.getItem("access_token");
-  const payload = token ? parseJwt(token) : null;
-  // simplejwt najčešće ima "user_id"
-  return payload?.user_id ?? null;
-}
-
-function getSubmittedKey(bookId) {
-  const userId = getUserIdFromAccessToken() ?? "anon";
-  return `wb_submitted_chapters_u${userId}_b${bookId}`;
-}
-
-function getSubmittedChapters(bookId) {
-  const key = getSubmittedKey(bookId);
-  try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function markChapterSubmitted(bookId, chapterId) {
-  const key = getSubmittedKey(bookId);
-  const current = new Set(getSubmittedChapters(bookId));
-  current.add(chapterId);
-  localStorage.setItem(key, JSON.stringify([...current]));
-}
-
 const filteredChapters = computed(() => {
-  const q = query.value.trim().toLowerCase();
+  const q = query.value.toLowerCase();
   if (!q) return chapters.value;
-
   return chapters.value.filter((c) => {
-    const title = (c.title || "").toLowerCase();
-    const number = String(c.chapter_number || "");
-    const text = (c.content || "").toLowerCase();
-    return title.includes(q) || number.includes(q) || text.includes(q);
+    return (
+      (c.title || "").toLowerCase().includes(q) ||
+      String(c.chapter_number || "").includes(q) ||
+      (c.content || "").toLowerCase().includes(q)
+    );
   });
 });
+
+function preview(content) {
+  const t = (content || "").trim();
+  if (!t) return "Nema teksta još.";
+  return t.length > 90 ? t.slice(0, 90) + "…" : t;
+}
+
+// ─── Chapter selection ───────────────────────────────────────────────────────
+
+const selectedChapterId = ref(null);
+const selectedChapter = computed(
+  () => chapters.value.find((c) => c.id === selectedChapterId.value) ?? null,
+);
 
 function selectChapter(id) {
   selectedChapterId.value = id;
 }
 
-function preview(content) {
-  const t = (content || "").trim();
-  return t ? (t.length > 90 ? t.slice(0, 90) + "…" : t) : "Nema teksta još.";
-}
+// ─── Submission status (composable) ─────────────────────────────────────────
 
-// modal (kasnije submit)
-const openModal = ref(false);
-const paragraph = ref("");
-const maxWords = 15;
+const {
+  loadingStatus,
+  fetchStatus,
+  markSubmitted,
+  refreshStatus,
+  getStatus,
+  hasSubmitted,
+} = useSubmissionStatus();
 
-const wordCount = computed(() => {
-  const t = paragraph.value.trim();
-  if (!t) return 0;
-  return t.split(/\s+/).filter(Boolean).length;
+// Kada se promijeni odabrano poglavlje — dohvati status sa backenda
+watch(selectedChapterId, async (chapterId) => {
+  if (chapterId && book.value) {
+    await fetchStatus(book.value.id, chapterId);
+  }
 });
+
+// Computed shortcuts za template
+const chapterStatusLoading = computed(
+  () => loadingStatus.value && getStatus(selectedChapterId.value) === null,
+);
+const currentChapterStatus = computed(() =>
+  selectedChapterId.value ? getStatus(selectedChapterId.value) : null,
+);
+
+// ─── Load & refresh knjige ───────────────────────────────────────────────────
 
 async function loadBook() {
   loading.value = true;
@@ -401,9 +463,40 @@ async function loadBook() {
   }
 }
 
+async function handleRefresh() {
+  await loadBook();
+  // Osveži i status za trenutno poglavlje
+  if (selectedChapterId.value && book.value) {
+    await refreshStatus(book.value.id, selectedChapterId.value);
+  }
+}
+
+// ─── Modal & submit ──────────────────────────────────────────────────────────
+
+const openModal = ref(false);
+const paragraph = ref("");
+const submitting = ref(false);
+const submitError = ref("");
+const maxWords = 15;
+
+const wordCount = computed(() => {
+  const t = paragraph.value.trim();
+  return t ? t.split(/\s+/).filter(Boolean).length : 0;
+});
+
+function closeModal() {
+  openModal.value = false;
+  submitError.value = "";
+  // Ne brišemo paragraph — možda korisnik slučajno zatvori
+}
+
+// Resetuj grešku kad korisnik kuca
+watch(paragraph, () => {
+  if (submitError.value) submitError.value = "";
+});
+
 async function submitCurrentParagraph() {
   submitError.value = "";
-  submitSuccess.value = "";
 
   if (!selectedChapter.value) {
     submitError.value = "Nije izabrano poglavlje.";
@@ -416,30 +509,26 @@ async function submitCurrentParagraph() {
     return;
   }
 
-  // (opciono) limit riječi 15 - može ostati i na backendu kasnije
-  // if (wordCount.value > maxWords) { ... }
-
   submitting.value = true;
   try {
     await bookService.submitParagraph(selectedChapter.value.id, text);
 
-    submitSuccess.value = "Pasus je poslat i čeka odobrenje.";
+    // Optimistički update stanja
+    markSubmitted(book.value.id, selectedChapter.value.id);
     paragraph.value = "";
-    markChapterSubmitted(book.value.id, selectedChapter.value.id);
-    // zatvori modal nakon kratkog feedback-a (ili odmah)
     openModal.value = false;
   } catch (e) {
-    // DRF ValidationError često bude { detail: "..."} ili { paragraph: ["..."] }
+    const data = e?.response?.data;
     submitError.value =
-      e?.response?.data?.detail ||
-      (Array.isArray(e?.response?.data?.paragraph)
-        ? e.response.data.paragraph[0]
-        : "") ||
+      data?.detail ||
+      (Array.isArray(data?.paragraph) ? data.paragraph[0] : "") ||
       "Neuspješno slanje pasusa.";
   } finally {
     submitting.value = false;
   }
 }
+
+// ─── Init ────────────────────────────────────────────────────────────────────
 
 onMounted(loadBook);
 </script>

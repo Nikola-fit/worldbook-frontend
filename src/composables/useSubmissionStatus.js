@@ -1,6 +1,6 @@
 // composables/useSubmissionStatus.js
-// Upravljanje statusom submission-a po poglavlju.
-// Backend je izvor istine; localStorage je samo brzi cache za UX.
+// Backend je jedini izvor istine.
+// statusMap je in-memory cache koji živi samo dok je stranica otvorena.
 
 import { ref } from "vue";
 import { http } from "@/lib/http";
@@ -14,104 +14,45 @@ import { http } from "@/lib/http";
  *   "rejected" — odbijeno
  */
 
-// ─── localStorage helpers ────────────────────────────────────────────────────
-
-function parseJwt(token) {
-  try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(
-      decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(""),
-      ),
-    );
-  } catch {
-    return null;
-  }
-}
-
-function getUserId() {
-  const token = localStorage.getItem("access_token");
-  const payload = token ? parseJwt(token) : null;
-  return payload?.user_id ?? "anon";
-}
-
-function cacheKey(bookId, chapterId) {
-  return `wb_sub_u${getUserId()}_b${bookId}_c${chapterId}`;
-}
-
-function readCache(bookId, chapterId) {
-  try {
-    return localStorage.getItem(cacheKey(bookId, chapterId)) || null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(bookId, chapterId, status) {
-  try {
-    localStorage.setItem(cacheKey(bookId, chapterId), status);
-  } catch {
-    /* storage pun — ignoriši */
-  }
-}
-
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 export function useSubmissionStatus() {
-  // Map: chapterId → status string | null
+  // In-memory map: chapterId → status
+  // Ne čuva se nigdje — pri refresh stranice ide novi request na backend
   const statusMap = ref({});
   const loadingStatus = ref(false);
 
   /**
    * Dohvati status sa backenda za dato poglavlje.
-   * Endpoint: GET /book/chapters/:id/my-status/
-   * Vraća: { status: "none" | "pending" | "approved" | "rejected" }
+   * Ako je već u mapi (u ovoj sesiji), ne ide ponovo na backend.
    */
-  async function fetchStatus(bookId, chapterId) {
-    // Ako već imamo u mapi, ne idemo na backend ponovo (osim forced refresh)
+  async function fetchStatus(chapterId) {
     if (statusMap.value[chapterId] !== undefined) return;
-
-    // Probaj cache prvo za instant UX
-    const cached = readCache(bookId, chapterId);
-    if (cached) {
-      statusMap.value[chapterId] = cached;
-    }
 
     loadingStatus.value = true;
     try {
       const { data } = await http.get(`/book/chapters/${chapterId}/my-status/`);
-      const s = data?.status ?? "none";
-      statusMap.value[chapterId] = s;
-      writeCache(bookId, chapterId, s);
+      statusMap.value[chapterId] = data?.status ?? "none";
     } catch {
-      // Ako endpoint ne postoji ili greška — fallback na cache ili "none"
-      if (!statusMap.value[chapterId]) {
-        statusMap.value[chapterId] = "none";
-      }
+      statusMap.value[chapterId] = "none";
     } finally {
       loadingStatus.value = false;
     }
   }
 
   /**
-   * Označi lokalno da je korisnik upravo submittovao (optimistički update).
-   * Backend će potvrditi pri sljedećem fetchStatus pozivu.
+   * Optimistički update odmah nakon submit-a.
+   * Korisnik odmah vidi "pending" bez čekanja na backend.
    */
-  function markSubmitted(bookId, chapterId) {
+  function markSubmitted(chapterId) {
     statusMap.value[chapterId] = "pending";
-    writeCache(bookId, chapterId, "pending");
   }
 
   /**
-   * Prisilni refresh sa backenda (npr. nakon "Osveži" dugmeta).
+   * Prisilni refresh sa backenda — briše iz mape i ponovo pita backend.
+   * Koristi se za "Osveži" dugme.
    */
-  async function refreshStatus(bookId, chapterId) {
-    // Obrišemo iz mape da fetchStatus ide na backend
+  async function refreshStatus(chapterId) {
     delete statusMap.value[chapterId];
-    await fetchStatus(bookId, chapterId);
+    await fetchStatus(chapterId);
   }
 
   /**
@@ -121,21 +62,11 @@ export function useSubmissionStatus() {
     return statusMap.value[chapterId] ?? null;
   }
 
-  /**
-   * Je li korisnik već submittovao (pending ili approved)?
-   */
-  function hasSubmitted(chapterId) {
-    const s = getStatus(chapterId);
-    return s === "pending" || s === "approved";
-  }
-
   return {
-    statusMap,
     loadingStatus,
     fetchStatus,
     markSubmitted,
     refreshStatus,
     getStatus,
-    hasSubmitted,
   };
 }

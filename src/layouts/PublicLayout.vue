@@ -58,24 +58,20 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import { useAuth } from "@/composables/useAuth";
 
 const router = useRouter();
 const currentYear = computed(() => new Date().getFullYear());
 
-// koristi ref da možemo ručno osvježiti stanje nakon logout-a
-const isAuthed = ref(!!localStorage.getItem("access_token"));
+const { isAuthed, clearTokens } = useAuth();
 
 function logout() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-
-  isAuthed.value = false;
+  clearTokens();
   router.push("/login");
 }
 </script>
-
 <style scoped>
 .public-layout {
   min-height: 100vh;
@@ -83,7 +79,11 @@ function logout() {
   flex-direction: column;
   background: #f5f7fb;
   color: #0f172a;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
 }
 
@@ -153,7 +153,9 @@ main {
   text-decoration: none;
   color: #1f2933;
   opacity: 0.8;
-  transition: opacity 0.15s ease, color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
 }
 
 .nav-links a:hover {
@@ -166,7 +168,9 @@ main {
   text-decoration: none;
   color: #1f2933;
   opacity: 0.8;
-  transition: opacity 0.15s ease, color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
 }
 .nav-link-router:hover {
   opacity: 1;
@@ -191,8 +195,12 @@ main {
   justify-content: center;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease,
-    border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.05s ease;
 }
 
 .btn-primary {

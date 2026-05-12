@@ -82,16 +82,12 @@
               <!-- Rejected -->
               <div
                 v-else-if="currentChapterStatus === 'rejected'"
-                class="flex items-center gap-2"
+                class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
               >
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_10px_26px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 transition"
-                  @click="openModal = true"
-                >
-                  Dodaj pasus
-                </button>
+                <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                <span class="font-medium">Odbijeno</span>
               </div>
+
               <!-- Nije poslato — prikaži dugme -->
               <button
                 v-else
@@ -418,19 +414,13 @@ function selectChapter(id) {
 
 // ─── Submission status (composable) ─────────────────────────────────────────
 
-const {
-  loadingStatus,
-  fetchStatus,
-  markSubmitted,
-  refreshStatus,
-  getStatus,
-  hasSubmitted,
-} = useSubmissionStatus();
+const { loadingStatus, fetchStatus, markSubmitted, refreshStatus, getStatus } =
+  useSubmissionStatus();
 
 // Kada se promijeni odabrano poglavlje — dohvati status sa backenda
 watch(selectedChapterId, async (chapterId) => {
-  if (chapterId && book.value) {
-    await fetchStatus(book.value.id, chapterId);
+  if (chapterId) {
+    await fetchStatus(chapterId);
   }
 });
 
@@ -465,9 +455,8 @@ async function loadBook() {
 
 async function handleRefresh() {
   await loadBook();
-  // Osveži i status za trenutno poglavlje
-  if (selectedChapterId.value && book.value) {
-    await refreshStatus(book.value.id, selectedChapterId.value);
+  if (selectedChapterId.value) {
+    await refreshStatus(selectedChapterId.value);
   }
 }
 
@@ -514,7 +503,7 @@ async function submitCurrentParagraph() {
     await bookService.submitParagraph(selectedChapter.value.id, text);
 
     // Optimistički update stanja
-    markSubmitted(book.value.id, selectedChapter.value.id);
+    markSubmitted(selectedChapter.value.id);
     paragraph.value = "";
     openModal.value = false;
   } catch (e) {

@@ -163,9 +163,11 @@
 import { reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import PublicLayout from "@/layouts/PublicLayout.vue";
+import { useAuth } from "@/composables/useAuth";
 import * as auth from "@/services/auth.service";
 
 const router = useRouter();
+const { setTokens } = useAuth();
 const loading = ref(false);
 const showPassword = ref(false);
 
@@ -208,8 +210,7 @@ async function onSubmit() {
     }
 
     // čuvanje JWT
-    localStorage.setItem("access_token", res.access);
-    localStorage.setItem("refresh_token", res.refresh);
+    setTokens(res.access, res.refresh);
 
     // redirect (promijeni po potrebi)
     router.push("/");
